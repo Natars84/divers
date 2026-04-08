@@ -21,14 +21,13 @@ mkdir -p "$DOSSIER_DEPLOIEMENT" "$DOSSIER_APPLICATION" 2>/dev/null
 # INITIALISATION DU SCRIPT ET DU FICHIER DE LOG
 # ==========================================================
 
+# Définition du chemin des logs
 LOG_FILE="/var/log/setup.log"
 
-# Création du dossier parent du fichier de log
-LOG_DIR=$(dirname "$LOG_FILE")
-mkdir -p "$LOG_DIR" 2>/dev/null
-
-# Création/vidage du fichier de log
-> "$LOG_FILE" 2>/dev/null
+if ! $(touch  "$LOG_FILE"); then
+    echo "Echec de la création du fichier de log, droits insuffisants"
+    exit 1
+fi
 
 # Fonction de journalisation avec double écriture
 log_message() {
