@@ -112,6 +112,7 @@ chmod 600 /etc/ssh/sshd_config
 systemctl stop ssh.socket
 systemctl disable ssh.socket
 systemctl mask ssh.socket
+systemctl restart ssh
 
 # ==========================================================
 # PHASE 5 : PARE-FEU ET FAIL2BAN
