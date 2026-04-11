@@ -1,26 +1,16 @@
 #!/bin/bash
 
 # ==========================================================
-# IDENTIFIANTS ADMIN DE BASE
-# ==========================================================
-DEFAULT_ADMIN_USER="admin"
-DEFAULT_ADMIN_PWD="changemoisitupeux"
-
-# ==========================================================
 # VARIABLES DE DÉPLOIEMENT
 # ==========================================================
 PORT_SSH=47165
 TIMEZONE="Europe/Paris"
-SCRIPT_DIR=$(dirname "$0")
-DOSSIER_DEPLOIEMENT="${SCRIPT_DIR}/deploiement"
-DOSSIER_APPLICATION="${SCRIPT_DIR}/application"
-
-mkdir -p "$DOSSIER_DEPLOIEMENT" "$DOSSIER_APPLICATION" 2>/dev/null
+LOG_FILE="/var/log/setup.log"
+FICHIER_SERVEUR_DEJA_CONFIGURE="/etc/serveur_configure" # Fichier indiquant que ce script a déjà été exécuté, donc le serveur est déjà configuré
 
 # ==========================================================
 # INITIALISATION DU SCRIPT ET DU FICHIER DE LOG
 # ==========================================================
-LOG_FILE="/var/log/setup.log"
 
 if ! touch "$LOG_FILE" 2>/dev/null; then
     echo "Echec de la création du fichier de log, droits insuffisants (utilisez sudo)"
@@ -39,7 +29,6 @@ log_message() {
 
 log_message INFO "Début de l'exécution du script de déploiement Ubuntu."
 
-FICHIER_SERVEUR_DEJA_CONFIGURE="/etc/serveur_configure"
 if [ -f "$FICHIER_SERVEUR_DEJA_CONFIGURE" ]; then
     log_message INFO "Le serveur a déjà été configuré, arrêt du script."
     exit 0
