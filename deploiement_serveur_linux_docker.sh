@@ -91,6 +91,7 @@ echo "AuthenticationMethods publickey" >> /etc/ssh/sshd_config
 echo "MaxAuthTries 3" >> /etc/ssh/sshd_config
 echo "MaxSessions 2" >> /etc/ssh/sshd_config
 echo "LoginGraceTime 30" >> /etc/ssh/sshd_config
+echo "UsePAM yes" >> /etc/ssh/sshd_config
 echo "X11Forwarding no" >> /etc/ssh/sshd_config
 echo "AllowTcpForwarding no" >> /etc/ssh/sshd_config
 echo "AllowAgentForwarding no" >> /etc/ssh/sshd_config
@@ -107,6 +108,10 @@ echo "Subsystem sftp /usr/lib/openssh/sftp-server" >> /etc/ssh/sshd_config
 
 chown root:root /etc/ssh/sshd_config
 chmod 600 /etc/ssh/sshd_config
+
+systemctl stop ssh.socket
+systemctl disable ssh.socket
+systemctl mask ssh.socket
 
 # ==========================================================
 # PHASE 5 : PARE-FEU ET FAIL2BAN
