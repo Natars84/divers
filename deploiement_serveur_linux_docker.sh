@@ -3,11 +3,13 @@
 # ==========================================================
 # VARIABLES DE DÉPLOIEMENT
 # ==========================================================
-PORT_SSH=47165
+PORT_SSH=$1
 TIMEZONE="Europe/Paris"
 LOG_FILE="/var/log/setup.log"
-FICHIER_SERVEUR_DEJA_CONFIGURE="/etc/serveur_configure" # Fichier indiquant que ce script a déjà été exécuté, donc le serveur est déjà configuré
 DOSSIER_DOCKER="/op/docker"
+NOM_SERVEUR=$2
+
+FICHIER_SERVEUR_DEJA_CONFIGURE="/etc/serveur_configure" # Fichier indiquant que ce script a déjà été exécuté, donc le serveur est déjà configuré
 
 # ==========================================================
 # INITIALISATION DU SCRIPT ET DU FICHIER DE LOG
@@ -113,7 +115,17 @@ chmod 600 /etc/ssh/sshd_config
 systemctl stop ssh.socket
 systemctl disable ssh.socket
 systemctl mask ssh.socket
-systemctl restart ssh
+
+# On valide la config SSH avant de redémarrer le service
+if sshd -t; then
+    systemctl restart ssh
+    log_message INFO "Service SSH redémarré avec succès sur le port ${PORT_SSH}."
+else
+    log_message ERREUR "ERREUR de syntaxe SSH. Le service n'a PAS été redémarré."
+    mv /etc/ssh/sshd_config /etc/ssh/sshd_config.new
+    mv /etc/ssh/sshd_config.backup /etc/ssh/sshd_config
+    log_message INFO "Configuration SSH initiale restaurée."
+fi
 
 # ==========================================================
 # PHASE 5 : PARE-FEU ET FAIL2BAN
@@ -148,10 +160,10 @@ systemctl restart fail2ban >> "$LOG_FILE" 2>&1
 log_message INFO "Phase 6 : Installation et configuration de Docker."
 
 # Ajout de la clé GPG de Docker
-apt install ca-certificates curl
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-chmod a+r /etc/apt/keyrings/docker.asc
+apt install ca-certificates curl >> "$LOG_FILE" 2>&1
+install -m 0755 -d /etc/apt/keyrings >> "$LOG_FILE" 2>&1
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc >> "$LOG_FILE" 2>&1
+chmod a+r /etc/apt/keyrings/docker.asc >> "$LOG_FILE" 2>&1
 
 # Ajout du dépôt aux sources APT
 tee /etc/apt/sources.list.d/docker.sources <<EOF
@@ -164,17 +176,16 @@ Signed-By: /etc/apt/keyrings/docker.asc
 EOF
 
 # Mise à jour des dépôts et installation de Docker
-apt update --yes
-apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+apt update --yes >> "$LOG_FILE" 2>&1
+apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >> "$LOG_FILE" 2>&1
 
 # Création du groupe Docker (utilsisation de la commande Docker sans sudo)
-groupeadd docker
-sudo usermod -aG docker $USER
-newgrp docker
+groupadd docker
+sudo usermod -aG docker $SUDO_USER
 
 # Test post-installation de Docker
-echo "Test post-installation de docker."
-docker run hello-world
+log_message INFO "Test post-installation de docker."
+docker run hello-world >> "$LOG_FILE" 2>&1
 
 # Création du dossier Docker accueillant les projets compose
 mkdir -p $DOSSIER_DOCKER
@@ -210,15 +221,31 @@ sudo systemctl enable docker.service
 sudo systemctl enable containerd.service
 
 # ==========================================================
-# FINALISATION
+# PHASE 7 : PERSONNALISATION DU TERMINAL UTILISATEUR
 # ==========================================================
-# On valide la config SSH avant de redémarrer le service
-if sshd -t; then
-    systemctl restart ssh
-    log_message INFO "Service SSH redémarré avec succès sur le port ${PORT_SSH}."
-    touch "$FICHIER_SERVEUR_DEJA_CONFIGURE"
-else
-    log_message ERREUR "ERREUR de syntaxe SSH. Le service n'a PAS été redémarré."
-fi
+log_message INFO "Phase 7 : personnalisation du serveur"
+log_message INFO "Modification des prompt utilisateur et root"
+cat << 'EOF' | sudo tee -a "/home/$SUDO_USER/.bashrc" > /dev/null
+# Configuration personnalisée
+export PS1="\[\$(tput bold)\]\[\$(tput setaf 6)\]\t: [\[\$(tput setaf 2)\]\u\[\$(tput setaf 7)\]\[\$(tput setaf 6)\]@\[\$(tput bold)\]\[\$(tput setaf 3)\]\H\[\$(tput setaf 6)\]]\[\$(tput setaf 5)\] \w\\$ \[\$(tput sgr0)\]"
+EOF
 
+# Personnalisation de la ligne de prompt des futurs utilisateurs
+cat << 'EOF' | sudo tee -a "/etc/skel/.bashrc" > /dev/null
+# Configuration personnalisée
+export PS1="\[\$(tput bold)\]\[\$(tput setaf 6)\]\t: [\[\$(tput setaf 2)\]\u\[\$(tput setaf 7)\]\[\$(tput setaf 6)\]@\[\$(tput bold)\]\[\$(tput setaf 3)\]\H\[\$(tput setaf 6)\]]\[\$(tput setaf 5)\] \w\\$ \[\$(tput sgr0)\]"
+EOF
+
+# Personnalisation de la ligne de prompt de root
+cat << 'EOF' | sudo tee -a "/root/.bashrc" > /dev/null
+# Configuration personnalisée
+export PS1="\[\$(tput bold)\]\[\$(tput setaf 6)\]\t: [\[\$(tput setaf 1)\]\u\[\$(tput setaf 7)\]\[\$(tput setaf 6)\]@\[\$(tput bold)\]\[\$(tput setaf 3)\]\H\[\$(tput setaf 6)\]]\[\$(tput setaf 5)\] \w\\$ \[\$(tput sgr0)\]"
+EOF
+
+log_message INFO "Génération du MOTD"
+apt install --yes figlet toilet
+toilet -f standard $NOM_SERVEUR --filter border > /etc/motd
+apt remove figlet toilet
+
+touch "$FICHIER_SERVEUR_DEJA_CONFIGURE"
 log_message INFO "Fin de configuration. Pensez à vérifier votre accès avant de fermer cette session."
