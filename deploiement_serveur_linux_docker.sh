@@ -7,6 +7,7 @@ PORT_SSH=47165
 TIMEZONE="Europe/Paris"
 LOG_FILE="/var/log/setup.log"
 FICHIER_SERVEUR_DEJA_CONFIGURE="/etc/serveur_configure" # Fichier indiquant que ce script a déjà été exécuté, donc le serveur est déjà configuré
+DOSSIER_DOCKER="/op/docker"
 
 # ==========================================================
 # INITIALISATION DU SCRIPT ET DU FICHIER DE LOG
@@ -174,6 +175,35 @@ newgrp docker
 # Test post-installation de Docker
 echo "Test post-installation de docker."
 docker run hello-world
+
+# Création du dossier Docker accueillant les projets compose
+mkdir -p $DOSSIER_DOCKER
+
+# Création d'un script de prune Docker
+emplacementScriptPruneDocker="$DOSSIER_DOCKER/prune.sh"
+cat << 'EOF' > "$emplacementScriptPruneDocker"
+#!/bin/bash
+LOG_PREFIX="[Docker-prune]"
+
+log_message() { 
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $LOG_PREFIX $1" 
+}
+
+if [[ $EUID -ne 0 ]]; then
+    log_message "ERREUR: le script doit être lancé en tant que 'root' (sudo)."
+    exit 1
+fi
+
+log_message "Début du nettoyage complet de Docker."
+docker system prune -af --volumes
+
+log_message "Nettoyage terminé."
+log_message "Espace disque actuel :"
+docker system df
+exit 0
+EOF
+
+chmod +x "$emplacementScriptPruneDocker"
 
 # Lancement de Docker au démarrage
 sudo systemctl enable docker.service
