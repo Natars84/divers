@@ -3,11 +3,20 @@
 # ==========================================================
 # VARIABLES DE DÉPLOIEMENT
 # ==========================================================
-PORT_SSH=$1
+
+# Génération d port SSH
+#####
+## Définition des bornes du générateur
+NOMBRE_MINIMUM=10000
+NOMBRE_MAXIMUM=60000
+
+PORT_SSH=$(shuf -i $NOMBRE_MINIMUM-$NOMBRE_MAXIMUM -n 1) # Génération aléatoire du port SSH
+#####
+
 TIMEZONE="Europe/Paris"
 LOG_FILE="/var/log/setup.log"
 DOSSIER_DOCKER="/op/docker"
-NOM_SERVEUR=$2
+NOM_SERVEUR=$1
 
 FICHIER_SERVEUR_DEJA_CONFIGURE="/etc/serveur_configure" # Fichier indiquant que ce script a déjà été exécuté, donc le serveur est déjà configuré
 
@@ -245,7 +254,7 @@ EOF
 log_message INFO "Génération du MOTD"
 apt install --yes figlet toilet
 toilet -f standard $NOM_SERVEUR --filter border > /etc/motd
-apt remove figlet toilet
+apt remove figlet toilet --yes
 
 touch "$FICHIER_SERVEUR_DEJA_CONFIGURE"
 log_message INFO "Fin de configuration. Pensez à vérifier votre accès avant de fermer cette session."
