@@ -61,8 +61,8 @@ log_message INFO "Définition du fuseau horaire sur : $TIMEZONE."
 ln -fs /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 dpkg-reconfigure -f noninteractive tzdata >> "$LOG_FILE" 2>&1
 
-log_message INFO "Hostname de la machine renomée en: $NOM_MACHINE"
-hostname "$NOM_MACHINE" # On met à jour le nom de la machine
+log_message INFO "Hostname de la machine renomée en: $NOM_SERVEUR"
+hostname "$NOM_SERVEUR" # On met à jour le nom de la machine
 
 # ==========================================================
 # PHASE 2 : MISE À JOUR ET INSTALLATION DES PAQUETS
