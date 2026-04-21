@@ -12,8 +12,7 @@ PORT_SSH_MAXIMUM=60000
 
 TIMEZONE="Europe/Paris"
 LOG_FILE="/var/log/setup.log"
-DOSSIER_DOCKER="/op/docker"
-NOM_SERVEUR=$1
+DOSSIER_DOCKER="/opt/docker"
 
 FICHIER_SERVEUR_DEJA_CONFIGURE="/etc/serveur_configure" # Fichier indiquant que ce script a déjà été exécuté, donc le serveur est déjà configuré
 
@@ -44,6 +43,14 @@ if [ -f "$FICHIER_SERVEUR_DEJA_CONFIGURE" ]; then
 fi
 
 # ==========================================================
+# PHASE 0 : DEMANDER A L'UTILISATEUR LES INFORMATIONS UTILES
+# ==========================================================
+# Configuration du nom du serveur
+read -r -p "Nom du serveur ? (Par défaut: $(hostname)) : " NOM_SERVEUR
+NOM_SERVEUR=${NOM_SERVEUR:-$(hostname)} # Le nom d'hôte de la machine par défaut
+NOM_SERVEUR=$(echo "$NOM_SERVEUR" | tr -dc '[:alnum:]\-_') # Suppression des caractères problématiques
+
+# ==========================================================
 # PHASE 1 : CONFIGURATION NON-INTERACTIVE ET FUSEAU HORAIRE
 # ==========================================================
 log_message INFO "Phase 1 : Configuration du mode APT non-interactif et du fuseau horaire."
@@ -53,6 +60,9 @@ export DEBIAN_FRONTEND=noninteractive
 log_message INFO "Définition du fuseau horaire sur : $TIMEZONE."
 ln -fs /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 dpkg-reconfigure -f noninteractive tzdata >> "$LOG_FILE" 2>&1
+
+log_message INFO "Hostname de la machine renomée en: $NOM_MACHINE"
+hostname "$NOM_MACHINE" # On met à jour le nom de la machine
 
 # ==========================================================
 # PHASE 2 : MISE À JOUR ET INSTALLATION DES PAQUETS
