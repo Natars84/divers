@@ -277,7 +277,7 @@ EOF
 
 log_message INFO "Génération du MOTD"
 apt install --yes figlet toilet >> "$LOG_FILE" 2>&1 
-toilet -f standard $NOM_SERVEUR --filter border > /etc/motd
+toilet --termwidth -f standard $NOM_SERVEUR --filter border > /etc/motd
 apt remove figlet toilet --yes >> "$LOG_FILE" 2>&1
 
 touch "$FICHIER_SERVEUR_DEJA_CONFIGURE"
