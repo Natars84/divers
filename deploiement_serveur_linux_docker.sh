@@ -89,48 +89,57 @@ if [ -f /etc/ssh/sshd_config ]; then
 fi
 
 # Injection de la nouvelle configuration SSH
-echo "# Configuration sécurisée" > /etc/ssh/sshd_config
-echo "Port ${PORT_SSH}" >> /etc/ssh/sshd_config
-echo "Protocol 2" >> /etc/ssh/sshd_config
-echo "AddressFamily inet" >> /etc/ssh/sshd_config
-echo "PermitRootLogin no" >> /etc/ssh/sshd_config
-echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config
-echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
-echo "PermitEmptyPasswords no" >> /etc/ssh/sshd_config
-echo "AuthenticationMethods publickey" >> /etc/ssh/sshd_config
-echo "MaxAuthTries 3" >> /etc/ssh/sshd_config
-echo "MaxSessions 2" >> /etc/ssh/sshd_config
-echo "LoginGraceTime 30" >> /etc/ssh/sshd_config
-echo "UsePAM yes" >> /etc/ssh/sshd_config
-echo "X11Forwarding no" >> /etc/ssh/sshd_config
-echo "AllowTcpForwarding no" >> /etc/ssh/sshd_config
-echo "AllowAgentForwarding no" >> /etc/ssh/sshd_config
-echo "AllowStreamLocalForwarding no" >> /etc/ssh/sshd_config
-echo "GatewayPorts no" >> /etc/ssh/sshd_config
-echo "PermitTunnel no" >> /etc/ssh/sshd_config
-echo "KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256" >> /etc/ssh/sshd_config
-echo "Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com" >> /etc/ssh/sshd_config
-echo "MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com" >> /etc/ssh/sshd_config
-echo "LogLevel VERBOSE" >> /etc/ssh/sshd_config
-echo "PrintMotd no" >> /etc/ssh/sshd_config
-echo "AcceptEnv LANG LC_*" >> /etc/ssh/sshd_config
-echo "Subsystem sftp /usr/lib/openssh/sftp-server" >> /etc/ssh/sshd_config
+cat <<EOF > /etc/ssh/sshd_config
+# Configuration sécurisée
+Port ${PORT_SSH}
+Protocol 2
+AddressFamily inet
+PermitRootLogin no
+PubkeyAuthentication yes
+PasswordAuthentication no
+PermitEmptyPasswords no
+AuthenticationMethods publickey
+MaxAuthTries 3
+MaxSessions 2
+LoginGraceTime 30
+UsePAM yes
+X11Forwarding no
+AllowTcpForwarding no
+AllowAgentForwarding no
+AllowStreamLocalForwarding no
+GatewayPorts no
+PermitTunnel no
+KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
+LogLevel VERBOSE
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem sftp /usr/lib/openssh/sftp-server
+EOF
 
 chown root:root /etc/ssh/sshd_config
 chmod 600 /etc/ssh/sshd_config
 
-systemctl stop ssh.socket
-systemctl disable ssh.socket
-systemctl mask ssh.socket
+mkdir -p /run/sshd
+chmod 755 /run/sshd
+
+systemctl stop ssh.socket >/dev/null 2>&1
+systemctl disable ssh.socket >/dev/null 2>&1
+systemctl mask ssh.socket >/dev/null 2>&1
 
 # On valide la config SSH avant de redémarrer le service
+CONFIG_SSH_VALIDE=0
 if sshd -t; then
+    CONFIG_SSH_VALIDE=1
     systemctl restart ssh
     log_message INFO "Service SSH redémarré avec succès sur le port ${PORT_SSH}."
 else
     log_message ERREUR "ERREUR de syntaxe SSH. Le service n'a PAS été redémarré."
     mv /etc/ssh/sshd_config /etc/ssh/sshd_config.new
     mv /etc/ssh/sshd_config.backup /etc/ssh/sshd_config
+    systemctl unmask ssh.socket >/dev/null 2>&1
+    systemctl start ssh.socket >/dev/null 2>&1
     log_message INFO "Configuration SSH initiale restaurée."
 fi
 
@@ -143,21 +152,28 @@ log_message INFO "Phase 5 : Configuration UFW et Fail2Ban."
 ufw --force reset >> "$LOG_FILE" 2>&1
 ufw default deny incoming
 ufw default allow outgoing
+
+# On ouvre le port SSH configuré (22 si la config SSH a échouée)
+if [ $CONFIG_SSH_VALIDE -ne 1 ]; then
+    PORT_SSH=22
+    ufw allow ${PORT_SSH}/tcp
+fi
 ufw allow ${PORT_SSH}/tcp
-ufw allow 80/tcp
-ufw allow 443/tcp
+
 echo "y" | ufw enable >> "$LOG_FILE" 2>&1
 
 # Configuration de Fail2Ban
 log_message INFO "Configuration des jails Fail2Ban..."
 
-echo "[sshd]" > /etc/fail2ban/jail.local
-echo "enabled = true" >> /etc/fail2ban/jail.local
-echo "port = ${PORT_SSH}" >> /etc/fail2ban/jail.local
-echo "filter = sshd" >> /etc/fail2ban/jail.local
-echo "logpath = /var/log/auth.log" >> /etc/fail2ban/jail.local
-echo "maxretry = 3" >> /etc/fail2ban/jail.local
-echo "bantime = 3600" >> /etc/fail2ban/jail.local
+cat <<EOF > /etc/fail2ban/jail.local
+[sshd]
+enabled = true
+port = ${PORT_SSH}
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+bantime = 3600
+EOF
 
 systemctl restart fail2ban >> "$LOG_FILE" 2>&1
 
