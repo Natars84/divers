@@ -4,13 +4,10 @@
 # VARIABLES DE DÉPLOIEMENT
 # ==========================================================
 
-# Génération d port SSH
-#####
+# Génération de numéro de port SSH
 ## Définition des bornes du générateur
-NOMBRE_MINIMUM=10000
-NOMBRE_MAXIMUM=60000
-
-PORT_SSH=$(shuf -i $NOMBRE_MINIMUM-$NOMBRE_MAXIMUM -n 1) # Génération aléatoire du port SSH
+PORT_SSH_MINIMUM=10000
+PORT_SSH_MAXIMUM=60000
 #####
 
 TIMEZONE="Europe/Paris"
@@ -83,6 +80,7 @@ echo "0 2 * * * root apt update -y && apt upgrade -y && apt autoclean" | crontab
 # ==========================================================
 # PHASE 4 : CONFIGURATION DE LA CONNEXION SSH
 # ==========================================================
+PORT_SSH=$(shuf -i $PORT_SSH_MINIMUM-$PORT_SSH_MAXIMUM -n 1) # Génération aléatoire du port SSH
 log_message INFO "Phase 4 : Configuration SSH sur le port ${PORT_SSH}."
 
 # Backup de la configuration SSH actuelle
@@ -252,9 +250,9 @@ export PS1="\[\$(tput bold)\]\[\$(tput setaf 6)\]\t: [\[\$(tput setaf 1)\]\u\[\$
 EOF
 
 log_message INFO "Génération du MOTD"
-apt install --yes figlet toilet
+apt install --yes figlet toilet >> "$LOG_FILE" 2>&1 
 toilet -f standard $NOM_SERVEUR --filter border > /etc/motd
-apt remove figlet toilet --yes
+apt remove figlet toilet --yes >> "$LOG_FILE" 2>&1
 
 touch "$FICHIER_SERVEUR_DEJA_CONFIGURE"
 log_message INFO "Fin de configuration. Pensez à vérifier votre accès avant de fermer cette session."
