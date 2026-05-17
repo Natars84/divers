@@ -214,7 +214,10 @@ apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-co
 
 # Création du groupe Docker (utilsisation de la commande Docker sans sudo)
 groupadd docker
-sudo usermod -aG docker $SUDO_USER
+usermod -aG docker $SUDO_USER
+
+# Création d'un utilisateur dédié à Docker
+useradd -grs /bin/false docker dockeruser
 
 # Test post-installation de Docker
 log_message INFO "Test post-installation de docker."
@@ -222,6 +225,8 @@ docker run hello-world >> "$LOG_FILE" 2>&1
 
 # Création du dossier Docker accueillant les projets compose
 mkdir -p $DOSSIER_DOCKER
+chown dockeruser:docker $DOSSIER_DOCKER
+chmod 770 $DOSSIER_DOCKER
 
 # Création d'un script de prune Docker
 emplacementScriptPruneDocker="$DOSSIER_DOCKER/prune.sh"
@@ -252,6 +257,9 @@ chmod +x "$emplacementScriptPruneDocker"
 # Lancement de Docker au démarrage
 sudo systemctl enable docker.service
 sudo systemctl enable containerd.service
+
+# Ajout d'un raccourcis vers Docker
+ls -s $DOSSIER_DOCKER /home/$SUDO_USER/docker
 
 # ==========================================================
 # PHASE 7 : PERSONNALISATION DU TERMINAL UTILISATEUR
