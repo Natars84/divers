@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # ==========================================================
 # VARIABLES DE DÉPLOIEMENT
 # ==========================================================
@@ -22,6 +24,11 @@ FICHIER_SERVEUR_DEJA_CONFIGURE="/etc/serveur_configure" # Fichier indiquant que 
 
 if ! touch "$LOG_FILE" 2>/dev/null; then
     echo "Echec de la création du fichier de log, droits insuffisants (utilisez sudo)"
+    exit 1
+fi
+
+if [ -z "$SUDO_USER" ] || [ "$SUDO_USER" = "root" ]; then
+    log_message ERREUR "Lancez ce script avec sudo depuis un utilisateur non-root."
     exit 1
 fi
 
@@ -49,6 +56,43 @@ fi
 read -r -p "Nom du serveur ? (Par défaut: $(hostname)) : " NOM_SERVEUR
 NOM_SERVEUR=${NOM_SERVEUR:-$(hostname)} # Le nom d'hôte de la machine par défaut
 NOM_SERVEUR=$(echo "$NOM_SERVEUR" | tr -dc '[:alnum:]\-_') # Suppression des caractères problématiques
+
+# Génération de la paire de clés SSH sur le serveur
+NOM_CLE="$NOM_SERVEUR"
+CHEMIN_CLE="/home/$SUDO_USER/.ssh/$NOM_CLE"
+
+mkdir -p "/home/$SUDO_USER/.ssh"
+chmod 700 "/home/$SUDO_USER/.ssh"
+
+if [ ! -f "$CHEMIN_CLE" ]; then
+    ssh-keygen -t ed25519 -f "$CHEMIN_CLE" -C "$NOM_CLE" -N ""
+    log_message INFO "Paire de clés SSH générée : $CHEMIN_CLE"
+else
+    log_message INFO "Clé SSH déjà existante, conservée : $CHEMIN_CLE"
+fi
+
+# Autorisation de la clé publique sur ce serveur
+cat "$CHEMIN_CLE.pub" >> "/home/$SUDO_USER/.ssh/authorized_keys"
+chmod 600 "/home/$SUDO_USER/.ssh/authorized_keys"
+chown -R "$SUDO_USER:$SUDO_USER" "/home/$SUDO_USER/.ssh"
+
+# Affichage de la clé privée à copier sur le PC client
+echo ""
+echo "========================================================"
+echo "  COPIEZ cette clé privée sur votre PC MAINTENANT"
+echo "  Commande depuis votre PC :"
+echo "  Fichier de destination recommandé : ~/.ssh/$NOM_CLE"
+echo "========================================================"
+cat "$CHEMIN_CLE"
+echo "========================================================"
+echo ""
+
+# Pause — l'utilisateur confirme avoir copié la clé avant de continuer
+read -r -p "Avez-vous copié la clé privée sur votre PC ? (oui/non) : " CLE_COPIEE
+if [ "$CLE_COPIEE" != "oui" ]; then
+    log_message ERREUR "Clé non confirmée. Arrêt du script pour éviter un lockout."
+    exit 1
+fi
 
 # ==========================================================
 # PHASE 1 : CONFIGURATION NON-INTERACTIVE ET FUSEAU HORAIRE
@@ -85,7 +129,7 @@ dpkg-reconfigure -f noninteractive unattended-upgrades >> "$LOG_FILE" 2>&1
 log_message INFO "Phase 3 : Configuration de la crontab."
 
 # Mise à jour du système chaque nuit à 2h du matin en tant que root
-echo "0 2 * * * root apt update -y && apt upgrade -y && apt autoclean" | crontab -
+(crontab -l 2>/dev/null; echo "0 2 * * * root apt update -y && apt upgrade -y && apt autoclean") | crontab -
 
 # ==========================================================
 # PHASE 4 : CONFIGURATION DE LA CONNEXION SSH
@@ -182,7 +226,7 @@ port = ${PORT_SSH}
 filter = sshd
 logpath = /var/log/auth.log
 maxretry = 3
-bantime = 3600
+bantime = 86400
 EOF
 
 systemctl restart fail2ban >> "$LOG_FILE" 2>&1
@@ -217,7 +261,7 @@ groupadd docker
 usermod -aG docker $SUDO_USER
 
 # Création d'un utilisateur dédié à Docker
-useradd -grs /bin/false docker dockeruser
+useradd -r -s /bin/false -g docker dockeruser
 
 # Test post-installation de Docker
 log_message INFO "Test post-installation de docker."
@@ -259,7 +303,7 @@ sudo systemctl enable docker.service
 sudo systemctl enable containerd.service
 
 # Ajout d'un raccourcis vers Docker
-ls -s $DOSSIER_DOCKER /home/$SUDO_USER/docker
+ln -s $DOSSIER_DOCKER /home/$SUDO_USER/docker
 
 # ==========================================================
 # PHASE 7 : PERSONNALISATION DU TERMINAL UTILISATEUR
@@ -284,9 +328,10 @@ export PS1="\[\$(tput bold)\]\[\$(tput setaf 6)\]\t: [\[\$(tput setaf 1)\]\u\[\$
 EOF
 
 log_message INFO "Génération du MOTD"
-apt install --yes figlet toilet >> "$LOG_FILE" 2>&1 
-toilet --termwidth -f standard $NOM_SERVEUR --filter border > /etc/motd
-apt remove figlet toilet --yes >> "$LOG_FILE" 2>&1
+apt install --yes figlet toilet >> "$LOG_FILE" 2>&1
+toilet --termwidth -f standard "$NOM_SERVEUR" --filter border > /etc/motd
+apt remove --yes figlet toilet >> "$LOG_FILE" 2>&1
+apt autoremove --yes >> "$LOG_FILE" 2>&1
 
 touch "$FICHIER_SERVEUR_DEJA_CONFIGURE"
 log_message INFO "Fin de configuration. Pensez à vérifier votre accès avant de fermer cette session."
