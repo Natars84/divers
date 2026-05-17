@@ -168,7 +168,7 @@ dpkg-reconfigure -f noninteractive unattended-upgrades >> "$LOG_FILE" 2>&1
 log_message INFO "Phase 3 : Configuration de la crontab."
 
 # Mise à jour du système chaque nuit à 2h du matin en tant que root
-(crontab -l 2>/dev/null; echo "0 2 * * * root apt update -y && apt upgrade -y && apt autoclean") | crontab -
+(crontab -l 2>/dev/null || true; echo "0 2 * * * root apt update -y && apt upgrade -y && apt autoclean") | crontab -
 
 # ==========================================================
 # PHASE 4 : CONFIGURATION DE LA CONNEXION SSH
@@ -217,9 +217,9 @@ chmod 600 /etc/ssh/sshd_config
 mkdir -p /run/sshd
 chmod 755 /run/sshd
 
-systemctl stop ssh.socket >/dev/null 2>&1
-systemctl disable ssh.socket >/dev/null 2>&1
-systemctl mask ssh.socket >/dev/null 2>&1
+systemctl stop ssh.socket >/dev/null 2>&1 || true
+systemctl disable ssh.socket >/dev/null 2>&1 || true
+systemctl mask ssh.socket >/dev/null 2>&1 || true
 
 # On valide la config SSH avant de redémarrer le service
 CONFIG_SSH_VALIDE=0
