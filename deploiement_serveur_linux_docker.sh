@@ -54,12 +54,9 @@ fi
 # ==========================================================
 log_message INFO "Vérification de la connectivité Internet et DNS."
 
-# Test DNS
-if ! getent hosts google.com > /dev/null 2>&1; then
-    log_message ERREUR "Résolution DNS impossible. Tentative de correction..."
-
-    # Correction persistante via systemd-resolved
-    cat <<EOF > /etc/systemd/resolved.conf
+# Configuration DNS persistante systématique via systemd-resolved
+log_message INFO "Configuration des DNS publics..."
+cat <<EOF > /etc/systemd/resolved.conf
 [Resolve]
 DNS=1.1.1.1 9.9.9.9 8.8.8.8
 FallbackDNS=1.0.0.1 149.112.112.112
@@ -67,17 +64,14 @@ DNSSEC=yes
 DNSOverTLS=yes
 EOF
 
-    systemctl restart systemd-resolved >> "$LOG_FILE" 2>&1
+systemctl restart systemd-resolved >> "$LOG_FILE" 2>&1
+ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+log_message INFO "DNS configurés : Cloudflare (1.1.1.1), Quad9 (9.9.9.9), Google (8.8.8.8)."
 
-    # S'assurer que resolv.conf pointe bien vers systemd-resolved
-    ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
-
-    # Nouveau test après correction
-    if ! getent hosts google.com > /dev/null 2>&1; then
-        log_message ERREUR "DNS toujours inaccessible après correction. Arrêt du script."
-        exit 1
-    fi
-    log_message INFO "DNS corrigé et persistant via systemd-resolved."
+# Test DNS
+if ! getent hosts google.com > /dev/null 2>&1; then
+    log_message ERREUR "Résolution DNS impossible après configuration. Arrêt du script."
+    exit 1
 fi
 
 # Test connectivité HTTP
@@ -86,7 +80,7 @@ if ! wget -q --spider --timeout=10 https://google.com > /dev/null 2>&1; then
     exit 1
 fi
 
-log_message INFO "Connectivité Internet OK."
+log_message INFO "Connectivité Internet et DNS OK."
 
 # ==========================================================
 # PHASE 0 : DEMANDER A L'UTILISATEUR LES INFORMATIONS UTILES
