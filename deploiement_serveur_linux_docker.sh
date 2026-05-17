@@ -296,11 +296,11 @@ apt update --yes >> "$LOG_FILE" 2>&1
 apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >> "$LOG_FILE" 2>&1
 
 # Création du groupe Docker (utilsisation de la commande Docker sans sudo)
-groupadd docker
-usermod -aG docker $SUDO_USER
+groupadd docker 2>/dev/null || true
+usermod -aG docker $SUDO_USER || true
 
 # Création d'un utilisateur dédié à Docker
-useradd -r -s /bin/false -g docker dockeruser
+useradd -r -s /bin/false -g docker dockeruser 2>/dev/null || true
 
 # Test post-installation de Docker
 log_message INFO "Test post-installation de docker."
